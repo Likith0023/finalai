@@ -1,0 +1,535 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Recorder & Product Info</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f9;
+            color: #333;    
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            background-image: url('https://img.freepik.com/premium-photo/white-stone-with-green-background-green-background_1221953-16667.jpg?w=740');
+            background-size: cover;
+            background-position: center;
+        }
+
+        #recorder-container {
+            /* background-image: url('https://img.freepik.com/premium-photo/two-black-metal-handles-with-light-side_1221953-4216.jpg?w=740'); */
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 20px rgba(46, 117, 150, 0.861);
+            text-align: left;
+            max-width: 800px;
+            width: 90%;
+            height: auto;
+            overflow-y: auto;
+            max-height: 90vh;
+        }
+
+        h2 {
+            font-size: 20px;
+            margin-bottom: 10px;
+            color: rgb(248, 249, 249);
+            margin-left: 190px;
+         }
+
+        /* label {
+            font-size: 14px;
+        } */
+
+        input,
+        textarea {
+            margin-top: 8px;
+            padding: 8px;
+            width: 100%;
+            border-radius: 5px;
+            border: 1px solid #171616 ;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        #audio-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        #start-recording,
+        #stop-recording {
+            margin: 10px;
+            padding: 12px 20px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+            width: 100%;
+            max-width: 200px;
+        }
+
+        #start-recording:hover,
+        #stop-recording:hover {
+            background-color: #0056b3;
+        }
+
+        #start-recording:disabled,
+        #stop-recording:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        audio {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        #transcription-text {
+            margin-top: 20px;
+            font-size: 16px;
+            color: #555;    
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        label {
+        font-weight: bold; 
+        color: rgb(250, 250, 251);      
+    }
+    </style>
+</head>
+<body>
+    <div id="recorder-container">
+        <h2>Audio Recorder & Product Information</h2>
+
+        <label for="product-name">Product Name</label>
+        <input type="text" id="product-name" placeholder="Enter product name" />
+
+        <label for="product-description">Product Description</label>
+        <textarea id="product-description" placeholder="Enter product description"></textarea>
+
+        <label for="product-brand">Brand</label>
+        <input type="text" id="product-brand" placeholder="Enter product brand" />
+
+        <label for="product-price">Price</label>
+        <input type="number" id="product-price" placeholder="Enter product price" />
+
+        <label for="product-discounted-price">Discounted Price</label>
+        <input type="number" id="product-discounted-price" placeholder="Enter discounted price" />
+
+        <label for="product-currency">Currency</label>
+        <input type="text" id="product-currency" placeholder="Enter currency (e.g., USD)" />
+
+        <label for="product-stock">Stock Quantity</label>
+        <input type="number" id="product-stock" placeholder="Enter stock quantity" />
+
+        <label for="product-in-stock">In Stock</label>
+        <input type="checkbox" id="product-in-stock" />
+
+        <label for="product-ribbon">Ribbon</label>
+        <input type="text" id="product-ribbon" placeholder="Enter ribbon details" />
+
+        <label for="product-size">Size Options (comma separated)</label>
+        <input type="text" id="product-size" placeholder="Enter size options" />
+
+        <label for="review-title">Review Title</label>
+        <input type="text" id="review-title" placeholder="Enter review title" />
+
+        <label for="review-rating">Review Rating (1-5)</label>
+        <input type="number" id="review-rating" min="1" max="5" placeholder="Enter rating" />
+
+        <label for="review-content">Review Content</label>
+        <textarea id="review-content" placeholder="Write your review"></textarea>
+
+        <label for="summary">Summary</label>
+        <textarea id="summary" placeholder="Write a summary"></textarea>
+
+        <label for="average-rating">Average Rating</label>
+        <input type="number" id="average-rating" placeholder="Enter average rating" />
+
+        <div id="audio-controls">
+            <button id="start-recording" onclick="handleStartRecording()">Start Recording</button>
+            <button id="stop-recording" onclick="handleStopRecording()" disabled>Stop Recording</button>
+            <audio id="playback" controls></audio>
+            <audio id="response-playback" controls></audio>
+        </div>
+
+        <div id="transcription-text"></div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+
+        async function checkFn(formData) {
+            try {
+                const response = await fetch('http://localhost:300/process_audio_returning_user', {
+                    method: 'POST',
+                    body: formData 
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                return await response.json(); 
+            } catch (error) {
+                console.error('There was a problem with the fetch operation:', error);
+            }
+        }
+
+        const handleStartRecording = function () {
+            navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    document.getElementById('playback').src = audioUrl;
+
+                    const formData = new FormData();
+                    formData.append('audio', audioBlob, 'audio.wav'); 
+
+                    formData.append('product_data', JSON.stringify({
+                        name: document.getElementById('product-name').value,
+                        description: document.getElementById('product-description').value,
+                        brand: document.getElementById('product-brand').value,
+                        price: document.getElementById('product-price').value,
+                        discountedPrice: document.getElementById('product-discounted-price').value,
+                        currency: document.getElementById('product-currency').value,
+                        stock: document.getElementById('product-stock').value,
+                        InStock: document.getElementById('product-in-stock').checked,
+                        ribbon: document.getElementById('product-ribbon').value,
+                        productOptions: [{ name: "Size", choices: document.getElementById('product-size').value.split(',').map(s => s.trim()) }]
+                    }));
+
+                    formData.append('reviews_data', JSON.stringify({
+                        items: [{
+                            title: document.getElementById('review-title').value,
+                            rating: document.getElementById('review-rating').value,
+                            content: document.getElementById('review-content').value
+                        }]
+                    }));
+
+                    formData.append('average_rating', document.getElementById('average-rating').value);
+                    formData.append('summary', document.getElementById('summary').value);
+
+                    const response = await checkFn(formData);
+                    const transcriptionText = document.getElementById('transcription-text');
+
+                    if (response) {
+                        transcriptionText.textContent = `Transcription: ${response.transcription_answer}`;
+
+                        const base64AudioString = response.file_content;
+                        const audioBlobFromBase64 = base64ToBlob(base64AudioString, 'audio/wav');
+                        const responsePlaybackElement = document.getElementById('response-playback');
+                        responsePlaybackElement.src = URL.createObjectURL(audioBlobFromBase64);
+                    }
+                };
+
+                document.getElementById('start-recording').disabled = true;
+                document.getElementById('stop-recording').disabled = false;
+            });
+        };
+
+
+        const handleStopRecording = function () {
+            mediaRecorder.stop();
+            document.getElementById('start-recording').disabled = false;
+            document.getElementById('stop-recording').disabled = true;
+        };
+
+        function base64ToBlob(base64, type = 'audio/wav') {
+            const byteCharacters = atob(base64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], { type: type });
+        }
+    </script>
+</body>
+</html>
+
+    </script>
+    
+</body>
+</html> -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Recorder & Product Info</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f9;
+            color: #333;    
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            background-image: url('https://img.freepik.com/premium-photo/white-stone-with-green-background-green-background_1221953-16667.jpg?w=740');
+            background-size: cover;
+            background-position: center;
+        }
+
+        #recorder-container {
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 20px rgba(46, 117, 150, 0.861);
+            text-align: left;
+            max-width: 800px;
+            width: 90%;
+            height: auto;
+            overflow-y: auto;
+            max-height: 90vh;
+        }
+
+        h2 {
+            font-size: 20px;
+            margin-bottom: 10px;
+            color: rgb(248, 249, 249);
+            margin-left: 190px;
+        }
+
+        input, textarea {
+            margin-top: 8px;
+            padding: 8px;
+            width: 100%;
+            border-radius: 5px;
+            border: 1px solid #171616;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        #audio-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        #start-recording, #stop-recording {
+            margin: 10px;
+            padding: 12px 20px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+            width: 100%;
+            max-width: 200px;
+        }
+
+        #start-recording:hover, #stop-recording:hover {
+            background-color: #0056b3;
+        }
+
+        #start-recording:disabled, #stop-recording:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        audio {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        #transcription-text {
+            margin-top: 20px;
+            font-size: 16px;
+            color: #555;    
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+
+        label {
+            font-weight: bold; 
+            color: rgb(250, 250, 251);      
+        }
+    </style>
+</head>
+<body>
+    <div id="recorder-container">
+        <h2>Audio Recorder & Product Information</h2>
+
+        <label for="product-name">Product Name</label>
+        <input type="text" id="product-name" placeholder="Enter product name" />
+
+        <label for="product-description">Product Description</label>
+        <textarea id="product-description" placeholder="Enter product description"></textarea>
+
+        <label for="product-brand">Brand</label>
+        <input type="text" id="product-brand" placeholder="Enter product brand" />
+
+        <label for="product-price">Price</label>
+        <input type="number" id="product-price" placeholder="Enter product price" />
+
+        <label for="product-discounted-price">Discounted Price</label>
+        <input type="number" id="product-discounted-price" placeholder="Enter discounted price" />
+
+        <label for="product-currency">Currency</label>
+        <input type="text" id="product-currency" placeholder="Enter currency (e.g., USD)" />
+
+        <label for="product-stock">Stock Quantity</label>
+        <input type="number" id="product-stock" placeholder="Enter stock quantity" />
+
+        <label for="product-in-stock">In Stock</label>
+        <input type="checkbox" id="product-in-stock" />
+
+        <label for="product-ribbon">Ribbon</label>
+        <input type="text" id="product-ribbon" placeholder="Enter ribbon details" />
+
+        <label for="product-size">Size Options (comma separated)</label>
+        <input type="text" id="product-size" placeholder="Enter size options" />
+
+        <label for="review-title">Review Title</label>
+        <input type="text" id="review-title" placeholder="Enter review title" />
+
+        <label for="review-rating">Review Rating (1-5)</label>
+        <input type="number" id="review-rating" min="1" max="5" placeholder="Enter rating" />
+
+        <label for="review-content">Review Content</label>
+        <textarea id="review-content" placeholder="Write your review"></textarea>
+
+        <label for="summary">Summary</label>
+        <textarea id="summary" placeholder="Write a summary"></textarea>
+
+        <label for="average-rating">Average Rating</label>
+        <input type="number" id="average-rating" placeholder="Enter average rating" />
+
+        <div id="audio-controls">
+            <button id="start-recording" onclick="handleStartRecording()">Start Recording</button>
+            <button id="stop-recording" onclick="handleStopRecording()" disabled>Stop Recording</button>
+            <audio id="playback" controls></audio>
+            <audio id="response-playback" controls style="display: none;"></audio>
+        </div>
+
+        <div id="transcription-text"></div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+
+        async function checkFn(formData) {
+            const apiUrl = '/process_audio_returning_user'; // Use a relative path
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: formData 
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok: ' + response.statusText);
+                }
+
+                const result = await response.json();
+                
+                // Assuming result.file_content is the Base64 string returned
+                const audioContent = result.file_content; 
+                if (audioContent) {
+                    const audioBlob = await fetch(`data:audio/wav;base64,${audioContent}`).then(res => res.blob());
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const responsePlayback = document.getElementById('response-playback');
+                    responsePlayback.src = audioUrl; // Set the audio source
+                    responsePlayback.play(); // Play the audio
+                }
+
+                // Display the transcription_text
+                document.getElementById('transcription-text').innerText = result.transcription_text || 'No transcription available.';
+            } catch (error) {
+                console.error('There was a problem with the fetch operation:', error);
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function handleStartRecording() {
+            audioChunks = [];
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.start();
+
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        const formData = new FormData();
+                        formData.append('audio', audioBlob);
+                        formData.append('product_data', JSON.stringify(collectProductData()));
+                        formData.append('reviews_data', JSON.stringify(collectReviewData()));
+                        formData.append('average_rating', document.getElementById('average-rating').value);
+                        formData.append('summary', document.getElementById('summary').value);
+
+                        await checkFn(formData);
+                        document.getElementById('playback').src = URL.createObjectURL(audioBlob);
+                    };
+
+                    document.getElementById('start-recording').disabled = true;
+                    document.getElementById('stop-recording').disabled = false;
+                });
+        }
+
+        function handleStopRecording() {
+            mediaRecorder.stop();
+            document.getElementById('start-recording').disabled = false;
+            document.getElementById('stop-recording').disabled = true;
+        }
+
+        function collectProductData() {
+            return {
+                name: document.getElementById('product-name').value,
+                description: document.getElementById('product-description').value,
+                brand: document.getElementById('product-brand').value,
+                price: document.getElementById('product-price').value,
+                discountedPrice: document.getElementById('product-discounted-price').value,
+                currency: document.getElementById('product-currency').value,
+                stock: document.getElementById('product-stock').value,
+                InStock: document.getElementById('product-in-stock').checked,
+                ribbon: document.getElementById('product-ribbon').value,
+                size: document.getElementById('product-size').value,
+            };
+        }
+
+        function collectReviewData() {
+            return {
+                title: document.getElementById('review-title').value,
+                rating: document.getElementById('review-rating').value,
+                content: document.getElementById('review-content').value,
+            };
+        }
+    </script>
+</body>
+</html>
